@@ -183,7 +183,6 @@ pre.out .note { color: var(--muted); font-style: italic; }
 .opts button:disabled { cursor: default; }
 .why { font-size: 0.9rem; padding: 8px 12px; border-radius: 6px; background: var(--sunk); }
 .why b { margin-right: 4px; }
-.retry { font-size: 0.8rem; background: none; border: 0; color: var(--muted); text-decoration: underline; cursor: pointer; padding: 0; justify-self: start; }
 
 /* Labs */
 .lab .cell-head { background: var(--surface); }
@@ -689,7 +688,8 @@ print('Length:', len(s))
 print('Repeated 5 times:', s * 5)
 print('First and last removed:', s[1:-1])
 print('Reversed:', s[::-1])`,
-  tests: [{ inputs: ["Python"], nums: [6], text: ["PythonPythonPythonPythonPython", "ytho", "nohtyP"] }] },
+  tests: [{ inputs: ["Python"], nums: [6], text: ["PythonPythonPythonPythonPython", "nohtyP"], words: ["ytho"] },
+          { inputs: ["abcdefg"], nums: [7], text: ["abcdefgabcdefgabcdefgabcdefgabcdefg", "gfedcba"], words: ["bcdef"] }] },
 { id: "2.2", session: "s2", title: "Name pattern", task: "Ask for a name and print it growing one letter per line: <pre>B\nBI\nBIL\nBILL</pre>",
   starter: "name = input('Enter your name: ')\n", hint: "Loop i from 1 to len(name) and print name[:i].",
   solution: R`name = input('Enter your name: ')
@@ -1054,11 +1054,13 @@ window.NOTES = {
 
   // ---------- progress ----------
   function quizId(sid, i) { return sid + ":" + i; }
+  // Options picked so far, in order. Older saves stored a single number.
+  function quizPicks(qid) { var v = state.quiz[qid]; return typeof v === "number" ? [v] : (v || []); }
   function sessionStats(sid) {
     var s = C.sessions.filter(function (x) { return x.id === sid; })[0];
     var labs = C.labs.filter(function (l) { return l.session === sid; });
     var lp = labs.filter(function (l) { return state.labs[l.id] === "pass"; }).length;
-    var qr = s.quiz.filter(function (q, i) { return state.quiz[quizId(sid, i)] === q.a; }).length;
+    var qr = s.quiz.filter(function (q, i) { return quizPicks(quizId(sid, i)).indexOf(q.a) !== -1; }).length;
     return { labs: labs.length, labsDone: lp, quiz: s.quiz.length, quizDone: qr, total: labs.length + s.quiz.length, done: lp + qr };
   }
   function updateProgress() {
@@ -1100,12 +1102,16 @@ window.NOTES = {
   }
 
   function editor(id, code) {
-    var ta = el("textarea", { class: "editor", id: id, spellcheck: "false", autocapitalize: "off", autocomplete: "off", "aria-label": "Python code" });
+    var ta = el("textarea", { class: "editor", id: id, spellcheck: "false", autocapitalize: "off", autocomplete: "off", "aria-label": "Python code. Tab indents; press Escape, then Tab, to move on." });
     ta.value = code;
     function fit() { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight + 4, 560) + "px"; }
     ta.addEventListener("input", fit);
+    var released = false; // after Esc, the next Tab leaves the editor instead of indenting
+    ta.addEventListener("blur", function () { released = false; });
     ta.addEventListener("keydown", function (e) {
-      if (e.key === "Tab" && !e.shiftKey) {
+      var wasReleased = released;
+      released = e.key === "Escape" || (released && e.key === "Shift");
+      if (e.key === "Tab" && !e.shiftKey && !wasReleased) {
         e.preventDefault();
         var s = ta.selectionStart, en = ta.selectionEnd;
         ta.value = ta.value.slice(0, s) + "    " + ta.value.slice(en);
@@ -1189,28 +1195,27 @@ window.NOTES = {
     var qid = quizId(sid, i);
     var box = el("div", { class: "q" });
     var opts = el("div", { class: "opts" });
-    var why = el("div", { class: "why", hidden: "" });
-    var retry = el("button", { class: "retry", hidden: "", text: "Try again", onclick: function () { delete state.quiz[qid]; save(); paint(); updateProgress(); } });
+    var why = el("div", { class: "why", hidden: "", "aria-live": "polite" });
     function paint() {
-      var chosen = state.quiz[qid];
+      var picks = quizPicks(qid), solved = picks.indexOf(q.a) !== -1;
       Array.prototype.forEach.call(opts.children, function (b, j) {
-        b.className = ""; b.disabled = chosen !== undefined;
-        if (chosen !== undefined) { if (j === q.a) b.className = "right"; else if (j === chosen) b.className = "wrong"; }
+        var picked = picks.indexOf(j) !== -1;
+        b.className = picked ? (j === q.a ? "right" : "wrong") : "";
+        b.disabled = solved || picked;
       });
-      if (chosen !== undefined) {
-        why.hidden = false;
-        why.innerHTML = "<b>" + (chosen === q.a ? "Correct." : "Not quite.") + "</b>";
+      why.hidden = !picks.length;
+      if (solved) {
+        why.innerHTML = "<b>" + (picks.length === 1 ? "Correct." : "Got it.") + "</b>";
         why.appendChild(document.createTextNode(q.why));
-        retry.hidden = chosen === q.a;
-      } else { why.hidden = true; retry.hidden = true; }
+      } else why.innerHTML = "<b>Not quite.</b>Look at the code again and pick another answer.";
     }
     q.opts.forEach(function (o, j) {
-      opts.appendChild(el("button", { type: "button", text: o, onclick: function () { state.quiz[qid] = j; save(); paint(); updateProgress(); } }));
+      opts.appendChild(el("button", { type: "button", text: o, onclick: function () { state.quiz[qid] = quizPicks(qid).concat(j); save(); paint(); updateProgress(); } }));
     });
     box.appendChild(el("div", { class: "qtext" }, [el("span", { class: "qnum", text: "Q" + (i + 1) }), el("span", { text: q.q })]));
     if (q.code) box.appendChild(el("pre", { text: q.code }));
     if (q.inputs) box.appendChild(el("div", { class: "qin", text: "User types: " + q.inputs.join(", ") }));
-    box.appendChild(opts); box.appendChild(why); box.appendChild(retry);
+    box.appendChild(opts); box.appendChild(why);
     paint();
     return box;
   }
@@ -1252,6 +1257,10 @@ window.NOTES = {
         if (miss.length) problems.push("expected to see " + miss.join(", "));
       }
       (t.text || []).forEach(function (s) { if (text.indexOf(s) === -1) problems.push("expected to see \"" + s + "\""); });
+      (t.words || []).forEach(function (w) {
+        var esc = w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        if (!new RegExp("(^|[^A-Za-z0-9])" + esc + "([^A-Za-z0-9]|$)").test(text)) problems.push("expected to see \"" + w + "\" by itself, not inside a longer word");
+      });
       (t.re || []).forEach(function (r) { if (!new RegExp(r, "i").test(text)) problems.push("output doesn't match what was asked"); });
       (t.no || []).forEach(function (r) { if (new RegExp(r, "i").test(text)) problems.push("output says \"" + r + "\" when it shouldn't"); });
       if (t.order) {
@@ -1384,7 +1393,7 @@ window.NOTES = {
       el("h2", { text: "Practise every session, then check your labs" }),
       el("div", { class: "howto" }, [
         el("p", { html: "Each session has short notes, code cells you can edit and run, quick questions and hands-on labs that check your answers. Python runs right here in your browser, so nothing needs installing." }),
-        el("p", { html: "Run a cell with the Run button or <kbd>Shift</kbd>+<kbd>Enter</kbd>. When code asks for <code>input()</code>, type the values in the Input box, separated by <code>|</code>." }),
+        el("p", { html: "Run a cell with the Run button or <kbd>Shift</kbd>+<kbd>Enter</kbd>. In an editor, <kbd>Tab</kbd> indents; to move on with the keyboard, press <kbd>Esc</kbd> and then <kbd>Tab</kbd>. When code asks for <code>input()</code>, type the values in the Input box, separated by <code>|</code>." }),
         el("p", { html: "Your progress and lab drafts are saved in this browser only." })
       ])
     ]));
