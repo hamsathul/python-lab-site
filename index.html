@@ -135,7 +135,7 @@ pre.out:empty::before { content: "Output appears here when you run the code."; c
 }
 @media (max-width: 899px) { .pane-out { border-top: 1px solid var(--line); } }
 .panes .stage { border-top: 0; }
-.panes .editor { margin: 0 14px; width: calc(100% - 28px); flex: 1; min-height: 9em; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
+.panes .editor { margin: 0 14px; width: calc(100% - 28px); flex: 1 0 auto; min-height: 9em; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); }
 .panes .editor::placeholder { color: var(--muted); font-style: italic; }
 .panes .io { border-top: 0; }
 .panes pre.out { margin: 0 14px 14px; flex: none; min-height: 9em; max-height: 380px; overflow-y: auto; overflow-x: auto; resize: vertical; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 6px; background: var(--sunk); }
@@ -273,7 +273,7 @@ footer.site a { color: var(--accent); }
 </header>
 <nav class="tabs" aria-label="Sessions"><div class="wrap" id="tabs" role="tablist"></div></nav>
 <main><div class="wrap" id="view"></div></main>
-<footer class="site"><div class="wrap">Spotted a mistake, or something not working? <a href="https://github.com/hamsathul/python-lab-site/issues">Report it on GitHub</a>.</div></footer>
+<footer class="site"><div class="wrap">Spotted a mistake, or something not working? <a href="https://github.com/hamsathul/python-lab-site/issues" target="_blank" rel="noopener">Report it on GitHub</a>.</div></footer>
 
 <script>
 // Python runner: Pyodide (real CPython) in a Web Worker (/py-worker.js), so a stuck loop can be stopped without freezing the page.
